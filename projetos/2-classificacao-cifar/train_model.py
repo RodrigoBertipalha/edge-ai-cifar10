@@ -36,7 +36,7 @@ tf.config.set_visible_devices([], "GPU")
 # ---------------------------------------------------------------------------
 
 SEED = 42
-BATCH_SIZE = 64
+BATCH_SIZE = 128
 EPOCHS = 25
 VAL_SIZE = 5000
 NUM_CLASSES = 10
@@ -76,12 +76,18 @@ def build_model():
 
             layers.Conv2D(32, (3, 3), padding="same", activation="relu"),
             layers.BatchNormalization(),
+            layers.Conv2D(32, (3, 3), padding="same", activation="relu"),
+            layers.BatchNormalization(),
             layers.MaxPooling2D((2, 2)),
 
             layers.Conv2D(64, (3, 3), padding="same", activation="relu"),
             layers.BatchNormalization(),
+            layers.Conv2D(64, (3, 3), padding="same", activation="relu"),
+            layers.BatchNormalization(),
             layers.MaxPooling2D((2, 2)),
 
+            layers.Conv2D(128, (3, 3), padding="same", activation="relu"),
+            layers.BatchNormalization(),
             layers.Conv2D(128, (3, 3), padding="same", activation="relu"),
             layers.BatchNormalization(),
             layers.MaxPooling2D((2, 2)),
@@ -116,13 +122,21 @@ def main():
         verbose=1,
     )
 
+    reduce_lr = keras.callbacks.ReduceLROnPlateau(
+        monitor="val_loss",
+        factor=0.5,
+        patience=2,
+        min_lr=1e-5,
+        verbose=1,
+    )
+
     model.fit(
         x_train,
         y_train,
         validation_data=(x_val, y_val),
         epochs=EPOCHS,
         batch_size=BATCH_SIZE,
-        callbacks=[early_stopping],
+        callbacks=[early_stopping, reduce_lr],
         verbose=2,
     )
 

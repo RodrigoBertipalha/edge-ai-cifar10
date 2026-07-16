@@ -102,8 +102,8 @@ projetos/2-classificacao-cifar/
 
 CNN simples no padrão VGG-mini, com 3 blocos convolucionais e Global Average Pooling antes do classificador. Fluxo completo:
 
-- Entrada 32×32×3, normalizada em `[0, 1]`.
-- **Data augmentation** embutida no modelo (`Sequential` interno) com `RandomFlip("horizontal")`, `RandomRotation(0.1)` e `RandomZoom(0.1)`. Como o dataset tem apenas 45.000 imagens de treino após o split, aumentar a variabilidade sem coletar dados adicionais foi fundamental para reduzir overfitting.
+- Entrada 32×32×3, normalizada em [0, 1].
+- **Data augmentation** embutida no modelo (Sequential interno) com RandomFlip("horizontal"), RandomRotation(0.1) e RandomZoom(0.1). Como o dataset tem apenas 45.000 imagens de treino após o split, aumentar a variabilidade sem coletar dados adicionais foi fundamental para reduzir overfitting.
 - **Bloco 1:** Conv2D(32) → BN → Conv2D(32) → BN → MaxPool(2×2)
 - **Bloco 2:** Conv2D(64) → BN → Conv2D(64) → BN → MaxPool(2×2)
 - **Bloco 3:** Conv2D(128) → BN → Conv2D(128) → BN → MaxPool(2×2)
@@ -113,19 +113,19 @@ Total: **297.706 parâmetros** treináveis (~1,13 MB antes de otimizar).
 
 **Justificativas técnicas de hiperparâmetros:**
 
-- `GlobalAveragePooling2D` no lugar de `Flatten` corta em ~90% os parâmetros antes do classificador denso e alinha o modelo ao objetivo Edge AI.
-- `ReduceLROnPlateau(factor=0.5, patience=2)` combinado com `Adam` foi escolhido porque a perda de validação oscilava com LR fixo de 1e-3. Durante o treino final, o schedule reduziu o LR duas vezes (épocas 17 e 23) e cada corte produziu queda visível em `val_loss`.
-- `batch_size=128` estabiliza as estatísticas de BatchNormalization e reduz o overhead por step em CPU, comparado ao batch 64 utilizado no experimento inicial.
+- GlobalAveragePooling2D no lugar de Flatten corta em ~90% os parâmetros antes do classificador denso e alinha o modelo ao objetivo Edge AI.
+- ReduceLROnPlateau (factor=0.5, patience=2) combinado com Adam foi escolhido porque a perda de validação oscilava com LR fixo de 1e-3. Durante o treino final, o schedule reduziu o LR duas vezes (épocas 17 e 23) e cada corte produziu queda visível em val_loss.
+- batch_size=128 estabiliza as estatísticas de BatchNormalization e reduz o overhead por step em CPU, comparado ao batch 64 utilizado no experimento inicial.
 
 ### 2️⃣ Bibliotecas Utilizadas
 
-- **TensorFlow** 2.21.0 — treino, `TFLiteConverter` e `tf.lite.Interpreter`
+- **TensorFlow** 2.21.0 — treino, TFLiteConverter e tf.lite.Interpreter
 - **NumPy** 2.4.6 — manipulação de arrays na inferência
 - **Python** 3.11
 
 ### 3️⃣ Técnica de Otimização do Modelo
 
-**Dynamic Range Quantization** via TensorFlow Lite. Em `optimize_model.py`, o `TFLiteConverter` é configurado com `converter.optimizations = [tf.lite.Optimize.DEFAULT]`, o que quantiza os pesos do modelo para inteiros de 8 bits enquanto mantém entrada/saída em float32. É a técnica de otimização mais leve de implementar (não exige dataset representativo) e já produz reduções substanciais de tamanho — adequada para o cenário Edge deste projeto.
+**Dynamic Range Quantization** via TensorFlow Lite. Em optimize_model.py, o TFLiteConverter é configurado com converter.optimizations = [tf.lite.Optimize.DEFAULT], o que quantiza os pesos do modelo para inteiros de 8 bits enquanto mantém entrada/saída em float32. É a técnica de otimização mais leve de implementar (não exige dataset representativo) e já produz reduções substanciais de tamanho — adequada para o cenário Edge deste projeto.
 
 ### 4️⃣ Resultados Obtidos
 
@@ -133,24 +133,24 @@ Total: **297.706 parâmetros** treináveis (~1,13 MB antes de otimizar).
 |---|---|
 | Acurácia final de validação | **0,8230 (82,30%)** |
 | Perda final de validação | 0,5281 |
-| Tamanho `model.h5` | 3,52 MB |
-| Tamanho `model.tflite` | 314 KB |
+| Tamanho model.h5 | 3,52 MB |
+| Tamanho model.tflite | 314 KB |
 | Redução após quantização | **91,29%** |
 
 ### 5️⃣ Comentários Adicionais
 
 O projeto foi desenvolvido em dois experimentos:
 
-- **Experimento 1** — CNN baseline com 1 Conv2D por bloco, batch 64, sem schedule de learning rate. Atingiu val_acc = 73,58% em 25 épocas, com `val_loss` ainda descendo na última época — sinal de que faltava tempo efetivo de aprendizado, não capacidade.
-- **Experimento 2 (final)** — mesma quantidade de blocos, mas com 2 Conv2D cada, batch 128 e `ReduceLROnPlateau`. Ganho de **+8,72 pontos percentuais** sem exceder as regras (3 blocos, mesmos componentes obrigatórios).
+- **Experimento 1** — CNN baseline com 1 Conv2D por bloco, batch 64, sem schedule de learning rate. Atingiu val_acc = 73,58% em 25 épocas, com val_loss ainda descendo na última época — sinal de que faltava tempo efetivo de aprendizado, não capacidade.
+- **Experimento 2 (final)** — mesma quantidade de blocos, mas com 2 Conv2D cada, batch 128 e ReduceLROnPlateau. Ganho de **+8,72 pontos percentuais** sem exceder as regras (3 blocos, mesmos componentes obrigatórios).
 
-**Decisão técnica interessante:** em vez de adicionar um 4º bloco, optei por dobrar as convoluções dentro de cada bloco (padrão VGG-mini). Isso aumenta a capacidade de extração de features sem alterar o campo receptivo espacial nem exceder o limite de blocos, e mantém o `.tflite` em ~314 KB — ainda apropriado para Edge.
+**Decisão técnica interessante:** em vez de adicionar um 4º bloco, optei por dobrar as convoluções dentro de cada bloco (padrão VGG-mini). Isso aumenta a capacidade de extração de features sem alterar o campo receptivo espacial nem exceder o limite de blocos, e mantém o .tflite em ~314 KB — ainda apropriado para Edge.
 
-**Limitação real:** o `val_loss` continuou caindo até a última época (25), então o teto de épocas — não a arquitetura — passou a ser o gargalo de acurácia. `EarlyStopping` foi mantido por ser requisito, mas não chegou a disparar em nenhum dos experimentos. Estimo que 40-50 épocas dariam mais 2-3 pp de acurácia com o mesmo modelo.
+**Limitação real:** o val_loss continuou caindo até a última época (25), então o teto de épocas — não a arquitetura — passou a ser o gargalo de acurácia. EarlyStopping foi mantido por ser requisito, mas não chegou a disparar em nenhum dos experimentos. Estimo que 40-50 épocas dariam mais 2-3 pp de acurácia com o mesmo modelo.
 
 ### 6️⃣ Exemplo de Inferência
 
-Saída do terminal ao rodar `python run_inference.py`:
+Saída do terminal ao rodar python run_inference.py:
 
 ```
 Rodando inferência em 5 amostras usando model.tflite:

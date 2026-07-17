@@ -1,6 +1,7 @@
 import os
 import sys
 import io
+import ssl
 
 # Forçar treino apenas em CPU (antes de importar tensorflow)
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
@@ -12,9 +13,10 @@ if sys.stdout.encoding != "utf-8":
 if sys.stderr.encoding != "utf-8":
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8")
 
+# O download do CIFAR-10 usa HTTPS; em alguns ambientes Windows o certificado local falha.
+ssl._create_default_https_context = ssl._create_unverified_context
+
 import tensorflow as tf
-from tensorflow import keras
-from tensorflow.keras import layers
 
 # Garantir que nenhuma GPU seja visível
 tf.config.set_visible_devices([], "GPU")
@@ -41,11 +43,11 @@ EPOCHS = 25
 VAL_SIZE = 5000
 NUM_CLASSES = 10
 
-keras.utils.set_random_seed(SEED)
+tf.keras.utils.set_random_seed(SEED)
 
 
 def load_data():
-    (x_train_full, y_train_full), (_, _) = keras.datasets.cifar10.load_data()
+    (x_train_full, y_train_full), (_, _) = tf.keras.datasets.cifar10.load_data()
 
     x_train_full = x_train_full.astype("float32") / 255.0
     y_train_full = y_train_full.astype("int32").reshape(-1)
@@ -60,48 +62,48 @@ def load_data():
 
 
 def build_model():
-    data_augmentation = keras.Sequential(
+    data_augmentation = tf.keras.Sequential(
         [
-            layers.RandomFlip("horizontal", seed=SEED),
-            layers.RandomRotation(0.1, seed=SEED),
-            layers.RandomZoom(0.1, seed=SEED),
+            tf.keras.layers.RandomFlip("horizontal", seed=SEED),
+            tf.keras.layers.RandomRotation(0.1, seed=SEED),
+            tf.keras.layers.RandomZoom(0.1, seed=SEED),
         ],
         name="data_augmentation",
     )
 
-    model = keras.Sequential(
+    model = tf.keras.Sequential(
         [
-            layers.Input(shape=(32, 32, 3)),
+            tf.keras.layers.Input(shape=(32, 32, 3)),
             data_augmentation,
 
-            layers.Conv2D(32, (3, 3), padding="same", activation="relu"),
-            layers.BatchNormalization(),
-            layers.Conv2D(32, (3, 3), padding="same", activation="relu"),
-            layers.BatchNormalization(),
-            layers.MaxPooling2D((2, 2)),
+            tf.keras.layers.Conv2D(32, (3, 3), padding="same", activation="relu"),
+            tf.keras.layers.BatchNormalization(),
+            tf.keras.layers.Conv2D(32, (3, 3), padding="same", activation="relu"),
+            tf.keras.layers.BatchNormalization(),
+            tf.keras.layers.MaxPooling2D((2, 2)),
 
-            layers.Conv2D(64, (3, 3), padding="same", activation="relu"),
-            layers.BatchNormalization(),
-            layers.Conv2D(64, (3, 3), padding="same", activation="relu"),
-            layers.BatchNormalization(),
-            layers.MaxPooling2D((2, 2)),
+            tf.keras.layers.Conv2D(64, (3, 3), padding="same", activation="relu"),
+            tf.keras.layers.BatchNormalization(),
+            tf.keras.layers.Conv2D(64, (3, 3), padding="same", activation="relu"),
+            tf.keras.layers.BatchNormalization(),
+            tf.keras.layers.MaxPooling2D((2, 2)),
 
-            layers.Conv2D(128, (3, 3), padding="same", activation="relu"),
-            layers.BatchNormalization(),
-            layers.Conv2D(128, (3, 3), padding="same", activation="relu"),
-            layers.BatchNormalization(),
-            layers.MaxPooling2D((2, 2)),
+            tf.keras.layers.Conv2D(128, (3, 3), padding="same", activation="relu"),
+            tf.keras.layers.BatchNormalization(),
+            tf.keras.layers.Conv2D(128, (3, 3), padding="same", activation="relu"),
+            tf.keras.layers.BatchNormalization(),
+            tf.keras.layers.MaxPooling2D((2, 2)),
 
-            layers.GlobalAveragePooling2D(),
-            layers.Dropout(0.5),
-            layers.Dense(64, activation="relu"),
-            layers.Dense(NUM_CLASSES, activation="softmax"),
+            tf.keras.layers.GlobalAveragePooling2D(),
+            tf.keras.layers.Dropout(0.5),
+            tf.keras.layers.Dense(64, activation="relu"),
+            tf.keras.layers.Dense(NUM_CLASSES, activation="softmax"),
         ],
         name="cifar10_cnn",
     )
 
     model.compile(
-        optimizer=keras.optimizers.Adam(),
+        optimizer=tf.keras.optimizers.Adam(),
         loss="sparse_categorical_crossentropy",
         metrics=["accuracy"],
     )
@@ -115,14 +117,14 @@ def main():
     model = build_model()
     model.summary()
 
-    early_stopping = keras.callbacks.EarlyStopping(
+    early_stopping = tf.keras.callbacks.EarlyStopping(
         monitor="val_loss",
         patience=5,
         restore_best_weights=True,
         verbose=1,
     )
 
-    reduce_lr = keras.callbacks.ReduceLROnPlateau(
+    reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(
         monitor="val_loss",
         factor=0.5,
         patience=2,
@@ -147,7 +149,7 @@ def main():
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
     model_path = os.path.join(script_dir, "model.h5")
-    model.save(model_path)
+    model.save(model_path, save_format="h5")
     print(f"Modelo salvo em: {model_path}")
 
 

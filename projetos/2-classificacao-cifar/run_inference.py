@@ -1,12 +1,16 @@
 import os
 import sys
 import io
+import ssl
 
 # Configurar stdout e stderr para usar UTF-8 e evitar erros de codificação no Windows
 if sys.stdout.encoding != 'utf-8':
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 if sys.stderr.encoding != 'utf-8':
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+
+# O download do CIFAR-10 usa HTTPS; em alguns ambientes Windows o certificado local falha.
+ssl._create_default_https_context = ssl._create_unverified_context
 
 import numpy as np
 import tensorflow as tf
